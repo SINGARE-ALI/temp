@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SINGATE® Pro - Surveillance du Bétail</title>
     
-    <!-- Leaflet CSS for map -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Leaflet CSS for map with SRI for security -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
+          crossorigin="anonymous" />
     
     <style>
         /* ===== GLOBAL STYLES ===== */
@@ -590,8 +592,10 @@
         © 2024 Tous droits réservés
     </footer>
     
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Leaflet JS with SRI for security -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin="anonymous"></script>
     
     <script>
         // ===== CONFIGURATION =====
@@ -1199,22 +1203,25 @@
             }, UPDATE_INTERVAL);
         }
         
-        // ===== SIMULATION CONTROLS (for testing) =====
+        // ===== SIMULATION CONTROLS (for testing/development only) =====
         /**
          * Simulate a cow leaving the security zone (for testing)
          * Can be called from browser console: simulateEscape(1)
+         * Note: This is exposed only for development/testing purposes
          */
-        window.simulateEscape = function(cowId) {
-            const cow = cattle.find(c => c.id === cowId);
-            if (cow) {
-                // Move cow outside security zone
-                cow.lat = CENTER_POINT.lat + 0.004; // ~400m away
-                cow.lon = CENTER_POINT.lon + 0.003;
-                cow.alertTriggered = false; // Reset to allow new alert
-                updateCattleMarker(cow);
-                checkSecurityZone();
-            }
-        };
+        if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+            window.simulateEscape = function(cowId) {
+                const cow = cattle.find(c => c.id === cowId);
+                if (cow) {
+                    // Move cow outside security zone
+                    cow.lat = CENTER_POINT.lat + 0.004; // ~400m away
+                    cow.lon = CENTER_POINT.lon + 0.003;
+                    cow.alertTriggered = false; // Reset to allow new alert
+                    updateCattleMarker(cow);
+                    checkSecurityZone();
+                }
+            };
+        }
     </script>
 </body>
 </html>
