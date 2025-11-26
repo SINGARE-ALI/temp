@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SINGATE® Pro - Surveillance du Bétail</title>
+    
+    <!-- Leaflet CSS for map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        /* ===== GLOBAL STYLES ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            color: #1f2937;
+        }
+        
+        /* ===== HEADER ===== */
+        .header {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        
+        .header h1 {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+        
+        .header-badge {
+            background-color: rgba(255,255,255,0.2);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+        
+        /* ===== KPI SECTION ===== */
+        .kpi-section {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            padding: 15px;
+            background: white;
+        }
+        
+        .kpi-card {
+            text-align: center;
+            padding: 12px;
+            border-radius: 12px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .kpi-card.safe {
+            border-color: #22c55e;
+            background: #f0fdf4;
+        }
+        
+        .kpi-card.warning {
+            border-color: #f59e0b;
+            background: #fffbeb;
+        }
+        
+        .kpi-card.danger {
+            border-color: #ef4444;
+            background: #fef2f2;
+        }
+        
+        .kpi-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #1e40af;
+        }
+        
+        .kpi-card.safe .kpi-value { color: #22c55e; }
+        .kpi-card.warning .kpi-value { color: #f59e0b; }
+        .kpi-card.danger .kpi-value { color: #ef4444; }
+        
+        .kpi-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 4px;
+        }
+        
+        /* ===== MAP CONTAINER ===== */
+        .map-container {
+            position: relative;
+            height: 50vh;
+            min-height: 300px;
+        }
+        
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        
+        /* ===== CATTLE LIST ===== */
+        .cattle-list {
+            padding: 15px;
+            background: white;
+        }
+        
+        .cattle-list h2 {
+            font-size: 1rem;
+            color: #374151;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .cattle-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            background: #f8fafc;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            border-left: 4px solid #22c55e;
+        }
+        
+        .cattle-item.warning {
+            border-left-color: #f59e0b;
+            background: #fffbeb;
+        }
+        
+        .cattle-item.danger {
+            border-left-color: #ef4444;
+            background: #fef2f2;
+        }
+        
+        .cattle-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .cattle-icon {
+            font-size: 1.5rem;
+        }
+        
+        .cattle-name {
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .cattle-status {
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+        
+        .cattle-distance {
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 5px 10px;
+            border-radius: 20px;
+            background: #e2e8f0;
+        }
+        
+        .cattle-item.warning .cattle-distance {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .cattle-item.danger .cattle-distance {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        /* ===== NAVIGATION PANEL ===== */
+        .nav-panel {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 20px 20px 0 0;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+        
+        .nav-panel.active {
+            display: block;
+        }
+        
+        .nav-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .nav-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        .nav-close {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+        
+        .nav-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .nav-stat {
+            text-align: center;
+            padding: 12px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 12px;
+        }
+        
+        .nav-stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+        
+        .nav-stat-label {
+            font-size: 0.75rem;
+            opacity: 0.9;
+        }
+        
+        .nav-progress-container {
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            height: 12px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        
+        .nav-progress {
+            background: #22c55e;
+            height: 100%;
+            width: 0%;
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+        
+        .nav-instruction {
+            text-align: center;
+            padding: 12px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+        }
+        
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .nav-btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .nav-btn.primary {
+            background: #22c55e;
+            color: white;
+        }
+        
+        .nav-btn.secondary {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        
+        /* ===== EMERGENCY OVERLAY ===== */
+        @keyframes emergency-pulse {
+            0% { background-color: rgba(220, 38, 38, 0.9); transform: scale(1); }
+            50% { background-color: rgba(245, 158, 11, 0.95); transform: scale(1.02); }
+            100% { background-color: rgba(220, 38, 38, 0.9); transform: scale(1); }
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        
+        @keyframes rotate-alert {
+            0% { transform: rotate(-15deg) scale(1); }
+            50% { transform: rotate(15deg) scale(1.1); }
+            100% { transform: rotate(-15deg) scale(1); }
+        }
+        
+        @keyframes success-bounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        .emergency-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 9999;
+            animation: emergency-pulse 1s infinite;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 20px;
+        }
+        
+        .emergency-overlay.active {
+            display: flex;
+        }
+        
+        .emergency-content {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            max-width: 350px;
+            width: 100%;
+            animation: shake 0.5s;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        
+        .emergency-icon {
+            font-size: 4rem;
+            animation: rotate-alert 1s infinite;
+            margin-bottom: 15px;
+        }
+        
+        .emergency-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #dc2626;
+            margin-bottom: 10px;
+        }
+        
+        .emergency-message {
+            color: #374151;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        
+        .emergency-cow-name {
+            font-weight: 700;
+            color: #dc2626;
+        }
+        
+        .emergency-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .emergency-btn-secondary {
+            background: #e5e7eb;
+            color: #374151;
+        }
+        
+        /* ===== SUCCESS OVERLAY ===== */
+        .success-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 9999;
+            background: rgba(34, 197, 94, 0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 20px;
+        }
+        
+        .success-overlay.active {
+            display: flex;
+        }
+        
+        .success-content {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            max-width: 350px;
+            width: 100%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        
+        .success-icon {
+            font-size: 4rem;
+            animation: success-bounce 1s infinite;
+            margin-bottom: 15px;
+        }
+        
+        .success-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #22c55e;
+            margin-bottom: 10px;
+        }
+        
+        .success-message {
+            color: #374151;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+        }
+        
+        .success-btn {
+            width: 100%;
+            padding: 16px;
+            background: #22c55e;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        /* ===== FOOTER ===== */
+        .footer {
+            text-align: center;
+            padding: 15px;
+            background: #1e293b;
+            color: #94a3b8;
+            font-size: 0.75rem;
+        }
+        
+        /* ===== LEAFLET CUSTOM STYLES ===== */
+        .leaflet-popup-content-wrapper {
+            border-radius: 12px;
+        }
+        
+        .cow-marker {
+            font-size: 1.5rem;
+            text-align: center;
+        }
+        
+        .center-marker {
+            font-size: 1.2rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <header class="header">
+        <h1>🐄 SINGATE® Pro</h1>
+        <span class="header-badge">Éleveur Mobile</span>
+    </header>
+    
+    <!-- KPI SECTION -->
+    <section class="kpi-section">
+        <div class="kpi-card safe">
+            <div class="kpi-value" id="kpi-safe">0</div>
+            <div class="kpi-label">En sécurité</div>
+        </div>
+        <div class="kpi-card warning">
+            <div class="kpi-value" id="kpi-warning">0</div>
+            <div class="kpi-label">Zone limite</div>
+        </div>
+        <div class="kpi-card danger">
+            <div class="kpi-value" id="kpi-danger">0</div>
+            <div class="kpi-label">Hors zone</div>
+        </div>
+    </section>
+    
+    <!-- MAP -->
+    <section class="map-container">
+        <div id="map"></div>
+    </section>
+    
+    <!-- CATTLE LIST -->
+    <section class="cattle-list">
+        <h2>📋 Liste du Bétail</h2>
+        <div id="cattle-container"></div>
+    </section>
+    
+    <!-- NAVIGATION PANEL -->
+    <div class="nav-panel" id="nav-panel">
+        <div class="nav-header">
+            <span class="nav-title">🧭 Navigation vers <span id="nav-target-name"></span></span>
+            <button class="nav-close" onclick="closeNavigation()">✕</button>
+        </div>
+        <div class="nav-stats">
+            <div class="nav-stat">
+                <div class="nav-stat-value" id="nav-distance">0m</div>
+                <div class="nav-stat-label">Distance restante</div>
+            </div>
+            <div class="nav-stat">
+                <div class="nav-stat-value" id="nav-time">0:00</div>
+                <div class="nav-stat-label">Temps estimé</div>
+            </div>
+        </div>
+        <div class="nav-progress-container">
+            <div class="nav-progress" id="nav-progress"></div>
+        </div>
+        <div class="nav-instruction" id="nav-instruction">
+            Préparez-vous à partir...
+        </div>
+        <div class="nav-buttons">
+            <button class="nav-btn primary" onclick="speakCurrentInstruction()">
+                🔊 Instruction vocale
+            </button>
+            <button class="nav-btn secondary" onclick="closeNavigation()">
+                ⏹️ Arrêter
+            </button>
+        </div>
+    </div>
+    
+    <!-- EMERGENCY OVERLAY -->
+    <div class="emergency-overlay" id="emergency-overlay">
+        <div class="emergency-content">
+            <div class="emergency-icon">🚨</div>
+            <div class="emergency-title">ALERTE SINGATE SINGATE</div>
+            <div class="emergency-message">
+                Le bœuf <span class="emergency-cow-name" id="emergency-cow-name"></span> 
+                a quitté la zone de sécurité de 300 mètres !
+            </div>
+            <button class="emergency-btn" onclick="startNavigationFromAlert()">
+                🧭 LANCER LA NAVIGATION GPS
+            </button>
+            <button class="emergency-btn emergency-btn-secondary" onclick="dismissEmergency()">
+                ✕ Fermer l'alerte
+            </button>
+        </div>
+    </div>
+    
+    <!-- SUCCESS OVERLAY -->
+    <div class="success-overlay" id="success-overlay">
+        <div class="success-content">
+            <div class="success-icon">✅</div>
+            <div class="success-title">Navigation Terminée !</div>
+            <div class="success-message">
+                Vous avez rejoint <span id="success-cow-name"></span>.
+            </div>
+            <button class="success-btn" onclick="confirmRecovery()">
+                ✅ CONFIRMER RÉCUPÉRATION
+            </button>
+        </div>
+    </div>
+    
+    <!-- FOOTER -->
+    <footer class="footer">
+        SINGATE® Pro v2.0 - Surveillance intelligente du bétail<br>
+        © 2024 Tous droits réservés
+    </footer>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // ===== CONFIGURATION =====
+        const CENTER_POINT = { lat: 9.600, lon: -7.700 };
+        const SECURITY_ZONE_RADIUS = 300; // meters
+        const WALKING_SPEED = 1.39; // m/s (5 km/h)
+        const UPDATE_INTERVAL = 2000; // ms
+        
+        // ===== STATE MANAGEMENT =====
+        let map;
+        let cattleMarkers = {};
+        let securityCircle;
+        let navigationLine;
+        let navigationInterval;
+        let currentAlertCow = null;
+        let initialNavigationDistance = 0;
+        
+        // Cattle data with tracking properties
+        let cattle = [
+            { id: 1, name: "Bella", lat: 9.601, lon: -7.699, status: 'safe', alertTriggered: false },
+            { id: 2, name: "Max", lat: 9.599, lon: -7.701, status: 'safe', alertTriggered: false },
+            { id: 3, name: "Luna", lat: 9.600, lon: -7.698, status: 'safe', alertTriggered: false },
+            { id: 4, name: "Rocky", lat: 9.598, lon: -7.702, status: 'safe', alertTriggered: false },
+            { id: 5, name: "Daisy", lat: 9.602, lon: -7.697, status: 'safe', alertTriggered: false }
+        ];
+        
+        // ===== INITIALIZATION =====
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeMap();
+            requestPermissions();
+            updateCattleList();
+            updateKPI();
+            startRealtimeUpdates();
+        });
+        
+        /**
+         * Request necessary permissions for notifications and geolocation
+         * Critical for mobile functionality
+         */
+        function requestPermissions() {
+            // Request notification permission
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+            // Request geolocation permission (silent)
+            if ('geolocation' in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    () => console.log('Géolocalisation activée'),
+                    () => console.log('Géolocalisation non disponible')
+                );
+            }
+        }
+        
+        /**
+         * Initialize Leaflet map with security zone
+         */
+        function initializeMap() {
+            // Create map centered on the herd location
+            map = L.map('map').setView([CENTER_POINT.lat, CENTER_POINT.lon], 16);
+            
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            // Add center marker (herder position)
+            const centerIcon = L.divIcon({
+                className: 'center-marker',
+                html: '🏠',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+            L.marker([CENTER_POINT.lat, CENTER_POINT.lon], { icon: centerIcon })
+                .addTo(map)
+                .bindPopup('<strong>Position Éleveur</strong><br>Centre de surveillance');
+            
+            // FEATURE 1: Security Zone Circle (300m)
+            // Zone de sécurité SINGATE avec label approprié
+            securityCircle = L.circle([CENTER_POINT.lat, CENTER_POINT.lon], {
+                radius: SECURITY_ZONE_RADIUS,
+                color: '#f59e0b',
+                fillColor: '#f59e0b',
+                fillOpacity: 0.1,
+                weight: 2,
+                dashArray: '10, 5'
+            }).addTo(map);
+            
+            // Add security zone label
+            securityCircle.bindTooltip(
+                'Zone de sécurité SINGATE (300m) - Seuil d\'alerte automatique',
+                { permanent: false, direction: 'top' }
+            );
+            
+            // Add all cattle markers
+            cattle.forEach(cow => addCattleMarker(cow));
+        }
+        
+        /**
+         * Add a marker for a specific cow
+         */
+        function addCattleMarker(cow) {
+            const cowIcon = L.divIcon({
+                className: 'cow-marker',
+                html: '🐄',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+            
+            const marker = L.marker([cow.lat, cow.lon], { icon: cowIcon })
+                .addTo(map)
+                .bindPopup(`<strong>${cow.name}</strong><br>ID: ${cow.id}`);
+            
+            cattleMarkers[cow.id] = marker;
+        }
+        
+        /**
+         * Update cattle marker position
+         */
+        function updateCattleMarker(cow) {
+            if (cattleMarkers[cow.id]) {
+                cattleMarkers[cow.id].setLatLng([cow.lat, cow.lon]);
+            }
+        }
+        
+        // ===== FEATURE 1: SECURITY ZONE CHECK =====
+        /**
+         * Check if any cattle has left the 300m security zone
+         * Called every 2 seconds by the realtime update system
+         */
+        function checkSecurityZone() {
+            const centerPoint = L.latLng(CENTER_POINT.lat, CENTER_POINT.lon);
+            
+            cattle.forEach(cow => {
+                const cowPosition = L.latLng(cow.lat, cow.lon);
+                const distance = centerPoint.distanceTo(cowPosition);
+                
+                // Check if cow has left the security zone
+                if (distance > SECURITY_ZONE_RADIUS && cow.status !== 'outOfZone') {
+                    cow.status = 'outOfZone';
+                    // Only trigger alert if not already triggered for this cow
+                    if (!cow.alertTriggered) {
+                        cow.alertTriggered = true;
+                        triggerSingateAlert(cow);
+                    }
+                } else if (distance <= SECURITY_ZONE_RADIUS && cow.status === 'outOfZone') {
+                    // Cow returned to safety
+                    cow.status = 'safe';
+                    cow.alertTriggered = false;
+                } else if (distance <= SECURITY_ZONE_RADIUS) {
+                    cow.status = 'safe';
+                }
+                
+                // Update status for warning zone (200-300m)
+                if (distance > 200 && distance <= SECURITY_ZONE_RADIUS) {
+                    cow.status = 'warning';
+                }
+            });
+            
+            // Update UI after checks
+            updateCattleList();
+            updateKPI();
+        }
+        
+        // ===== FEATURE 2: MULTIMODAL ALERT SYSTEM =====
+        /**
+         * Trigger the complete SINGATE SINGATE alert
+         * Combines voice, visual, and vibration alerts
+         */
+        function triggerSingateAlert(cow) {
+            currentAlertCow = cow;
+            
+            // 1. Trigger vibration
+            triggerVibration();
+            
+            // 2. Trigger voice alert
+            triggerVoiceAlert(cow.name);
+            
+            // 3. Show visual overlay
+            showEmergencyOverlay(cow);
+        }
+        
+        /**
+         * Voice synthesis alert - Priority feature
+         * Uses Web Speech API for vocal warnings
+         */
+        function triggerVoiceAlert(cowName) {
+            if ('speechSynthesis' in window) {
+                // Cancel any ongoing speech
+                speechSynthesis.cancel();
+                
+                const utterance = new SpeechSynthesisUtterance(
+                    `SINGATE ! SINGATE ! Alerte sécurité critique ! Le bœuf ${cowName} a quitté la zone de sécurité de 300 mètres !`
+                );
+                utterance.lang = 'fr-FR';
+                utterance.volume = 1.0;
+                utterance.rate = 0.9;
+                
+                speechSynthesis.speak(utterance);
+            } else {
+                // Fallback: enhanced visual alert
+                console.log('Speech synthesis not available - enhanced visual mode');
+            }
+        }
+        
+        /**
+         * Mobile vibration pattern for emergency
+         */
+        function triggerVibration() {
+            if ('vibrate' in navigator) {
+                // Pattern: vibrate 300ms, pause 150ms, vibrate 300ms, pause 150ms, vibrate 500ms
+                navigator.vibrate([300, 150, 300, 150, 500]);
+            }
+        }
+        
+        /**
+         * Show the emergency visual overlay
+         */
+        function showEmergencyOverlay(cow) {
+            const overlay = document.getElementById('emergency-overlay');
+            const cowNameEl = document.getElementById('emergency-cow-name');
+            
+            cowNameEl.textContent = cow.name;
+            overlay.classList.add('active');
+        }
+        
+        /**
+         * Dismiss the emergency overlay
+         */
+        function dismissEmergency() {
+            const overlay = document.getElementById('emergency-overlay');
+            overlay.classList.remove('active');
+        }
+        
+        // ===== FEATURE 3: GPS NAVIGATION SYSTEM =====
+        /**
+         * Start navigation from the emergency alert
+         */
+        function startNavigationFromAlert() {
+            if (currentAlertCow) {
+                dismissEmergency();
+                startNavigation(currentAlertCow);
+            }
+        }
+        
+        /**
+         * Start GPS navigation to a specific cow
+         */
+        function startNavigation(cow) {
+            const navPanel = document.getElementById('nav-panel');
+            const navTargetName = document.getElementById('nav-target-name');
+            
+            // Set target name
+            navTargetName.textContent = cow.name;
+            currentAlertCow = cow;
+            
+            // Calculate initial distance
+            const herderPosition = L.latLng(CENTER_POINT.lat, CENTER_POINT.lon);
+            const cowPosition = L.latLng(cow.lat, cow.lon);
+            initialNavigationDistance = herderPosition.distanceTo(cowPosition);
+            
+            // Draw navigation line on map
+            if (navigationLine) {
+                map.removeLayer(navigationLine);
+            }
+            navigationLine = L.polyline([
+                [CENTER_POINT.lat, CENTER_POINT.lon],
+                [cow.lat, cow.lon]
+            ], {
+                color: '#3b82f6',
+                weight: 4,
+                dashArray: '10, 10'
+            }).addTo(map);
+            
+            // Center map on route
+            map.fitBounds(navigationLine.getBounds(), { padding: [50, 50] });
+            
+            // Show navigation panel
+            navPanel.classList.add('active');
+            
+            // Start realtime navigation updates
+            updateNavigation(cow);
+            navigationInterval = setInterval(() => updateNavigation(cow), 1000);
+            
+            // Initial voice guidance
+            provideVoiceGuidance(initialNavigationDistance, cow.name);
+        }
+        
+        /**
+         * Update navigation panel with realtime data
+         */
+        function updateNavigation(targetCow) {
+            const herderPosition = L.latLng(CENTER_POINT.lat, CENTER_POINT.lon);
+            const cowPosition = L.latLng(targetCow.lat, targetCow.lon);
+            const distance = herderPosition.distanceTo(cowPosition);
+            
+            // Calculate estimated time (walking speed: 5 km/h = 1.39 m/s)
+            const timeEstimatedSeconds = Math.round(distance / WALKING_SPEED);
+            
+            // Update distance display
+            document.getElementById('nav-distance').textContent = `${Math.round(distance)}m`;
+            
+            // Update time display
+            document.getElementById('nav-time').textContent = formatTime(timeEstimatedSeconds);
+            
+            // Update progress bar
+            const progress = Math.max(0, (initialNavigationDistance - distance) / initialNavigationDistance * 100);
+            document.getElementById('nav-progress').style.width = `${Math.min(100, progress)}%`;
+            
+            // Update instruction text
+            updateNavigationInstruction(distance, targetCow.name);
+            
+            // Update navigation line
+            if (navigationLine) {
+                navigationLine.setLatLngs([
+                    [CENTER_POINT.lat, CENTER_POINT.lon],
+                    [targetCow.lat, targetCow.lon]
+                ]);
+            }
+            
+            // Check if arrived (distance < 15m)
+            if (distance < 15) {
+                completeNavigation(targetCow);
+            }
+        }
+        
+        /**
+         * Update the navigation instruction text
+         */
+        function updateNavigationInstruction(distance, cowName) {
+            const instructionEl = document.getElementById('nav-instruction');
+            let instruction = '';
+            
+            if (distance > 100) {
+                instruction = `➡️ Continuez vers ${cowName}. Distance: ${Math.round(distance)}m`;
+            } else if (distance > 50) {
+                instruction = `⚡ Vous approchez de ${cowName}. Plus que ${Math.round(distance)}m`;
+            } else if (distance > 20) {
+                instruction = `🎯 ${cowName} est proche ! ${Math.round(distance)}m restants`;
+            } else {
+                instruction = `✅ Vous êtes arrivé ! ${cowName} est devant vous`;
+            }
+            
+            instructionEl.textContent = instruction;
+        }
+        
+        /**
+         * Provide step-by-step voice guidance
+         */
+        function provideVoiceGuidance(distance, cowName) {
+            let instruction = '';
+            
+            if (distance > 100) {
+                instruction = `Continuez vers ${cowName}. Distance restante : ${Math.round(distance)} mètres.`;
+            } else if (distance > 20) {
+                instruction = `Vous approchez de ${cowName}. Plus que ${Math.round(distance)} mètres.`;
+            } else {
+                instruction = `Vous êtes arrivé ! ${cowName} est devant vous.`;
+            }
+            
+            speakInstruction(instruction);
+        }
+        
+        /**
+         * Speak a navigation instruction
+         */
+        function speakInstruction(text) {
+            if ('speechSynthesis' in window) {
+                speechSynthesis.cancel();
+                
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'fr-FR';
+                utterance.volume = 1.0;
+                utterance.rate = 1.0;
+                
+                speechSynthesis.speak(utterance);
+            }
+        }
+        
+        /**
+         * Speak current navigation instruction
+         */
+        function speakCurrentInstruction() {
+            if (currentAlertCow) {
+                const herderPosition = L.latLng(CENTER_POINT.lat, CENTER_POINT.lon);
+                const cowPosition = L.latLng(currentAlertCow.lat, currentAlertCow.lon);
+                const distance = herderPosition.distanceTo(cowPosition);
+                
+                provideVoiceGuidance(distance, currentAlertCow.name);
+            }
+        }
+        
+        /**
+         * Complete the navigation when arrived
+         */
+        function completeNavigation(cow) {
+            // Stop navigation updates
+            if (navigationInterval) {
+                clearInterval(navigationInterval);
+                navigationInterval = null;
+            }
+            
+            // Close navigation panel
+            closeNavigation();
+            
+            // Voice confirmation
+            speakInstruction(`Navigation terminée. Vous avez rejoint ${cow.name}.`);
+            
+            // Show success overlay
+            showSuccessOverlay(cow);
+        }
+        
+        /**
+         * Show success overlay when navigation is complete
+         */
+        function showSuccessOverlay(cow) {
+            const overlay = document.getElementById('success-overlay');
+            const cowNameEl = document.getElementById('success-cow-name');
+            
+            cowNameEl.textContent = cow.name;
+            overlay.classList.add('active');
+        }
+        
+        /**
+         * Confirm cow recovery and update status
+         */
+        function confirmRecovery() {
+            const overlay = document.getElementById('success-overlay');
+            overlay.classList.remove('active');
+            
+            if (currentAlertCow) {
+                // Update cow status to safe and move back to center
+                const cow = cattle.find(c => c.id === currentAlertCow.id);
+                if (cow) {
+                    cow.status = 'safe';
+                    cow.alertTriggered = false;
+                    // Simulate bringing cow back to safe zone
+                    cow.lat = CENTER_POINT.lat + (Math.random() * 0.001 - 0.0005);
+                    cow.lon = CENTER_POINT.lon + (Math.random() * 0.001 - 0.0005);
+                    updateCattleMarker(cow);
+                }
+                
+                currentAlertCow = null;
+            }
+            
+            // Update displays
+            updateCattleList();
+            updateKPI();
+            
+            // Voice confirmation
+            speakInstruction('Récupération confirmée. Le bétail est en sécurité.');
+        }
+        
+        /**
+         * Close navigation panel
+         */
+        function closeNavigation() {
+            const navPanel = document.getElementById('nav-panel');
+            navPanel.classList.remove('active');
+            
+            // Stop navigation updates
+            if (navigationInterval) {
+                clearInterval(navigationInterval);
+                navigationInterval = null;
+            }
+            
+            // Remove navigation line
+            if (navigationLine) {
+                map.removeLayer(navigationLine);
+                navigationLine = null;
+            }
+        }
+        
+        /**
+         * Format seconds to MM:SS format
+         */
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        // ===== UI UPDATE FUNCTIONS =====
+        /**
+         * Update the cattle list UI
+         */
+        function updateCattleList() {
+            const container = document.getElementById('cattle-container');
+            const centerPoint = L.latLng(CENTER_POINT.lat, CENTER_POINT.lon);
+            
+            container.innerHTML = cattle.map(cow => {
+                const cowPosition = L.latLng(cow.lat, cow.lon);
+                const distance = Math.round(centerPoint.distanceTo(cowPosition));
+                
+                let statusClass = '';
+                let statusText = 'En sécurité';
+                
+                if (distance > SECURITY_ZONE_RADIUS) {
+                    statusClass = 'danger';
+                    statusText = 'Hors zone !';
+                } else if (distance > 200) {
+                    statusClass = 'warning';
+                    statusText = 'Zone limite';
+                }
+                
+                return `
+                    <div class="cattle-item ${statusClass}" onclick="focusOnCow(${cow.id})">
+                        <div class="cattle-info">
+                            <span class="cattle-icon">🐄</span>
+                            <div>
+                                <div class="cattle-name">${cow.name}</div>
+                                <div class="cattle-status">${statusText}</div>
+                            </div>
+                        </div>
+                        <span class="cattle-distance">${distance}m</span>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        /**
+         * Update KPI cards
+         */
+        function updateKPI() {
+            const centerPoint = L.latLng(CENTER_POINT.lat, CENTER_POINT.lon);
+            
+            let safe = 0, warning = 0, danger = 0;
+            
+            cattle.forEach(cow => {
+                const cowPosition = L.latLng(cow.lat, cow.lon);
+                const distance = centerPoint.distanceTo(cowPosition);
+                
+                if (distance > SECURITY_ZONE_RADIUS) {
+                    danger++;
+                } else if (distance > 200) {
+                    warning++;
+                } else {
+                    safe++;
+                }
+            });
+            
+            document.getElementById('kpi-safe').textContent = safe;
+            document.getElementById('kpi-warning').textContent = warning;
+            document.getElementById('kpi-danger').textContent = danger;
+        }
+        
+        /**
+         * Focus map on a specific cow
+         */
+        function focusOnCow(cowId) {
+            const cow = cattle.find(c => c.id === cowId);
+            if (cow) {
+                map.setView([cow.lat, cow.lon], 17);
+                cattleMarkers[cow.id].openPopup();
+            }
+        }
+        
+        // ===== REALTIME UPDATES =====
+        /**
+         * Start realtime position updates
+         * Simulates cow movement and checks security zone every 2 seconds
+         */
+        function startRealtimeUpdates() {
+            setInterval(() => {
+                // Simulate cattle movement
+                cattle.forEach(cow => {
+                    // Small random movement
+                    cow.lat += (Math.random() - 0.5) * 0.0002;
+                    cow.lon += (Math.random() - 0.5) * 0.0002;
+                    
+                    // Update marker position
+                    updateCattleMarker(cow);
+                });
+                
+                // FEATURE 1: Check security zone every 2 seconds
+                checkSecurityZone();
+                
+            }, UPDATE_INTERVAL);
+        }
+        
+        // ===== SIMULATION CONTROLS (for testing) =====
+        /**
+         * Simulate a cow leaving the security zone (for testing)
+         * Can be called from browser console: simulateEscape(1)
+         */
+        window.simulateEscape = function(cowId) {
+            const cow = cattle.find(c => c.id === cowId);
+            if (cow) {
+                // Move cow outside security zone
+                cow.lat = CENTER_POINT.lat + 0.004; // ~400m away
+                cow.lon = CENTER_POINT.lon + 0.003;
+                cow.alertTriggered = false; // Reset to allow new alert
+                updateCattleMarker(cow);
+                checkSecurityZone();
+            }
+        };
+    </script>
+</body>
+</html>
