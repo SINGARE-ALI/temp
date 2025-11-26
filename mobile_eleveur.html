@@ -596,9 +596,31 @@
     <script>
         // ===== CONFIGURATION =====
         const CENTER_POINT = { lat: 9.600, lon: -7.700 };
-        const SECURITY_ZONE_RADIUS = 300; // meters
-        const WALKING_SPEED = 1.39; // m/s (5 km/h)
+        const SECURITY_ZONE_RADIUS = 300; // meters - Main security perimeter
+        const WARNING_ZONE_RADIUS = 200; // meters - Warning threshold before security breach
+        const ARRIVAL_THRESHOLD = 15; // meters - Distance to consider arrival at target
+        const WALKING_SPEED = 1.39; // m/s - Average human walking speed (5 km/h) on terrain
         const UPDATE_INTERVAL = 2000; // ms
+        
+        // Vibration pattern: vibrate 300ms, pause 150ms, vibrate 300ms, pause 150ms, vibrate 500ms
+        const EMERGENCY_VIBRATION_PATTERN = [300, 150, 300, 150, 500];
+        
+        // Recovery position offsets for simulating cow recovery
+        const RECOVERY_POSITION_OFFSET = 0.001; // degrees (~100m)
+        
+        // Alert message template
+        const SINGATE_ALERT_PREFIX = 'SINGATE ! SINGATE ! Alerte sécurité critique ! ';
+        
+        /**
+         * Escape HTML special characters to prevent XSS
+         * @param {string} text - Text to escape
+         * @returns {string} - Escaped text safe for HTML insertion
+         */
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
         
         // ===== STATE MANAGEMENT =====
         let map;
@@ -744,8 +766,8 @@
                     cow.status = 'safe';
                 }
                 
-                // Update status for warning zone (200-300m)
-                if (distance > 200 && distance <= SECURITY_ZONE_RADIUS) {
+                // Update status for warning zone (WARNING_ZONE_RADIUS to SECURITY_ZONE_RADIUS)
+                if (distance > WARNING_ZONE_RADIUS && distance <= SECURITY_ZONE_RADIUS) {
                     cow.status = 'warning';
                 }
             });
@@ -776,14 +798,18 @@
         /**
          * Voice synthesis alert - Priority feature
          * Uses Web Speech API for vocal warnings
+         * Note: cowName is sanitized for text-to-speech (no HTML context)
          */
         function triggerVoiceAlert(cowName) {
             if ('speechSynthesis' in window) {
                 // Cancel any ongoing speech
                 speechSynthesis.cancel();
                 
+                // Sanitize cowName for speech (remove any special characters)
+                const sanitizedName = String(cowName).replace(/[<>&"']/g, '');
+                
                 const utterance = new SpeechSynthesisUtterance(
-                    `SINGATE ! SINGATE ! Alerte sécurité critique ! Le bœuf ${cowName} a quitté la zone de sécurité de 300 mètres !`
+                    `${SINGATE_ALERT_PREFIX}Le bœuf ${sanitizedName} a quitté la zone de sécurité de ${SECURITY_ZONE_RADIUS} mètres !`
                 );
                 utterance.lang = 'fr-FR';
                 utterance.volume = 1.0;
@@ -801,8 +827,7 @@
          */
         function triggerVibration() {
             if ('vibrate' in navigator) {
-                // Pattern: vibrate 300ms, pause 150ms, vibrate 300ms, pause 150ms, vibrate 500ms
-                navigator.vibrate([300, 150, 300, 150, 500]);
+                navigator.vibrate(EMERGENCY_VIBRATION_PATTERN);
             }
         }
         
@@ -911,8 +936,8 @@
                 ]);
             }
             
-            // Check if arrived (distance < 15m)
-            if (distance < 15) {
+            // Check if arrived (distance < ARRIVAL_THRESHOLD)
+            if (distance < ARRIVAL_THRESHOLD) {
                 completeNavigation(targetCow);
             }
         }
@@ -1027,9 +1052,9 @@
                 if (cow) {
                     cow.status = 'safe';
                     cow.alertTriggered = false;
-                    // Simulate bringing cow back to safe zone
-                    cow.lat = CENTER_POINT.lat + (Math.random() * 0.001 - 0.0005);
-                    cow.lon = CENTER_POINT.lon + (Math.random() * 0.001 - 0.0005);
+                    // Simulate bringing cow back to safe zone (within security perimeter)
+                    cow.lat = CENTER_POINT.lat + (Math.random() * RECOVERY_POSITION_OFFSET - RECOVERY_POSITION_OFFSET / 2);
+                    cow.lon = CENTER_POINT.lon + (Math.random() * RECOVERY_POSITION_OFFSET - RECOVERY_POSITION_OFFSET / 2);
                     updateCattleMarker(cow);
                 }
                 
@@ -1091,17 +1116,20 @@
                 if (distance > SECURITY_ZONE_RADIUS) {
                     statusClass = 'danger';
                     statusText = 'Hors zone !';
-                } else if (distance > 200) {
+                } else if (distance > WARNING_ZONE_RADIUS) {
                     statusClass = 'warning';
                     statusText = 'Zone limite';
                 }
                 
+                // Escape cow name to prevent XSS
+                const safeName = escapeHtml(cow.name);
+                
                 return `
-                    <div class="cattle-item ${statusClass}" onclick="focusOnCow(${cow.id})">
+                    <div class="cattle-item ${statusClass}" onclick="focusOnCow(${Number(cow.id)})">
                         <div class="cattle-info">
                             <span class="cattle-icon">🐄</span>
                             <div>
-                                <div class="cattle-name">${cow.name}</div>
+                                <div class="cattle-name">${safeName}</div>
                                 <div class="cattle-status">${statusText}</div>
                             </div>
                         </div>
@@ -1125,7 +1153,7 @@
                 
                 if (distance > SECURITY_ZONE_RADIUS) {
                     danger++;
-                } else if (distance > 200) {
+                } else if (distance > WARNING_ZONE_RADIUS) {
                     warning++;
                 } else {
                     safe++;
